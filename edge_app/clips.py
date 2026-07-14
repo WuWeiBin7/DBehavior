@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import DefaultDict, Dict, Iterable, List, Tuple
 
 import cv2
@@ -18,6 +18,7 @@ class ClipBuilder:
     crop_size: Tuple[int, int]
     infer_interval_frames: int = 1
     _roi_frames: DefaultDict[str, deque[np.ndarray]] = field(default_factory=lambda: defaultdict(deque))
+    _roi_hints: DefaultDict[str, deque[float]] = field(default_factory=lambda: defaultdict(deque))
     _last_emitted_frame: Dict[str, int] = field(default_factory=dict)
     _last_seen_frame: Dict[str, int] = field(default_factory=dict)
 
@@ -30,16 +31,22 @@ class ClipBuilder:
             crop = crop_resize_letterbox(packet.frame_bgr, roi.bbox_xyxy, self.crop_size)
             crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
             queue = self._roi_frames[key]
+            hints = self._roi_hints[key]
             self._last_seen_frame[key] = packet.frame_id
             queue.append(crop_rgb)
+            hints.append(float(roi.score_hint))
             while len(queue) > max_needed:
                 queue.popleft()
+                hints.popleft()
             last_emitted = self._last_emitted_frame.get(key, -self.infer_interval_frames)
             can_emit = packet.frame_id - last_emitted >= max(1, self.infer_interval_frames)
             if len(queue) >= max_needed and can_emit:
                 sampled = list(queue)[-max_needed:: self.sample_stride]
                 if len(sampled) == self.clip_length:
-                    ready_rois.append(roi)
+                    temporal_features = dict(roi.features)
+                    temporal_features["temporal_hint_max"] = float(max(hints))
+                    temporal_features["temporal_hint_mean"] = float(np.mean(hints))
+                    ready_rois.append(replace(roi, features=temporal_features))
                     clips.append(np.stack(sampled, axis=0))
                     self._last_emitted_frame[key] = packet.frame_id
         self._discard_stale(packet.frame_id, max_needed * 2)
@@ -56,5 +63,6 @@ class ClipBuilder:
         stale = [key for key, seen in self._last_seen_frame.items() if frame_id - seen > max_idle_frames]
         for key in stale:
             self._roi_frames.pop(key, None)
+            self._roi_hints.pop(key, None)
             self._last_seen_frame.pop(key, None)
             self._last_emitted_frame.pop(key, None)

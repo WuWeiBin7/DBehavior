@@ -80,11 +80,12 @@ def body_angle_score(track: Track) -> float:
         return 0.0
     left_shoulder, right_shoulder = kpts[5], kpts[6]
     left_hip, right_hip = kpts[11], kpts[12]
-    valid = [p for p in (left_shoulder, right_shoulder, left_hip, right_hip) if p[2] > 0.2]
-    if len(valid) < 2:
+    valid_shoulders = [p[:2] for p in (left_shoulder, right_shoulder) if p[2] > 0.2]
+    valid_hips = [p[:2] for p in (left_hip, right_hip) if p[2] > 0.2]
+    if not valid_shoulders or not valid_hips:
         return 0.0
-    shoulder = np.mean([p[:2] for p in (left_shoulder, right_shoulder) if p[2] > 0.2], axis=0)
-    hip = np.mean([p[:2] for p in (left_hip, right_hip) if p[2] > 0.2], axis=0)
+    shoulder = np.mean(valid_shoulders, axis=0)
+    hip = np.mean(valid_hips, axis=0)
     dx = abs(float(shoulder[0] - hip[0]))
     dy = abs(float(shoulder[1] - hip[1]))
     if dx + dy <= 1e-6:

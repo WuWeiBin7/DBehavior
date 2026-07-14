@@ -71,6 +71,8 @@ class BehaviorEventConfig:
     candidate_gap_sec: float = 1.0
     single_person_fallback: bool = False
     single_person_model_threshold: float = 0.85
+    model_geometry_gate_threshold: float = 0.0
+    model_geometry_gate_floor: float = 1.0
     weights: Dict[str, float] = field(default_factory=dict)
 
 
@@ -82,6 +84,9 @@ class EventsConfig:
     snapshot_dir: str = "snapshots"
     video_dir: str = "videos"
     jsonl_name: str = "events.jsonl"
+    cross_event_suppression_sec: float = 0.0
+    cross_event_iou_threshold: float = 0.30
+    fall_geometry_override_threshold: float = 1.0
     fall: BehaviorEventConfig = field(default_factory=BehaviorEventConfig)
     fight: BehaviorEventConfig = field(default_factory=lambda: BehaviorEventConfig(cooldown_sec=10.0))
 

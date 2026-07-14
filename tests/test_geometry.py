@@ -1,6 +1,7 @@
 import numpy as np
 
-from edge_app.geometry import clip_bbox, crop_resize_letterbox, expand_bbox, merge_bboxes
+from edge_app.geometry import body_angle_score, clip_bbox, crop_resize_letterbox, expand_bbox, merge_bboxes
+from edge_app.types import Track
 
 
 def test_bbox_clip_expand_and_merge():
@@ -16,3 +17,12 @@ def test_crop_resize_letterbox_handles_boundary():
     crop = crop_resize_letterbox(frame, (-20, -20, 30, 30), (224, 224))
     assert crop.shape == (224, 224, 3)
     assert crop.dtype == np.uint8
+
+
+def test_body_angle_requires_both_shoulder_and_hip_evidence():
+    keypoints = np.zeros((17, 3), dtype=np.float32)
+    keypoints[5] = [20, 20, 0.9]
+    keypoints[6] = [30, 20, 0.9]
+    track = Track(1, (10, 10, 40, 100), 0.9, keypoints)
+
+    assert body_angle_score(track) == 0.0

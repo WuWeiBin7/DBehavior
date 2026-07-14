@@ -88,6 +88,7 @@ class BehaviorPipeline:
             action_scores,
             fused,
             self.events.snapshot(),
+            self.events.suppression_snapshot(),
         )
         self.diagnostics.record_confirmed(confirmed)
         for record in confirmed:

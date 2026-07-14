@@ -49,11 +49,14 @@ class PipelineDiagnostics:
         scores: List[ActionScore],
         fused: List[EventCandidate],
         states: Dict[str, str],
+        suppressions: List[Dict] | None = None,
     ) -> None:
         if not self.enabled:
             return
         self.counts["action_batches"] += int(bool(scores))
         self.counts["ready_clips"] += len(scores)
+        if suppressions:
+            self.counts["cross_event_suppressions"] += len(suppressions)
         fused_by_key = {(item.event_type, tuple(sorted(item.track_ids))): item for item in fused}
         for item in fused:
             self.fused_max[item.event_type] = max(self.fused_max[item.event_type], item.score)
@@ -69,6 +72,11 @@ class PipelineDiagnostics:
                 for item in fused
                 if tuple(sorted(item.track_ids)) == tuple(sorted(roi.track_ids))
             }
+            fusion_features = {
+                item.event_type: item.features
+                for item in fused
+                if tuple(sorted(item.track_ids)) == tuple(sorted(roi.track_ids))
+            }
             lines.append(
                 {
                     "frame_id": frame_id,
@@ -81,7 +89,9 @@ class PipelineDiagnostics:
                     "probabilities": action.scores,
                     "fused_score": fused_score,
                     "fused_scores": same_tracks,
+                    "fusion_features": fusion_features,
                     "states": states,
+                    "event_suppressions": suppressions or [],
                 }
             )
         if lines:

@@ -72,12 +72,16 @@ fight_score = 0.72 * P(fight)
 摔倒融合分数默认由以下分量组成：
 
 ```text
-fall_score = 0.55 * P(fall)
+geometry_gate = clip(max(0.25, fall_geometry / 0.15), 0, 1)
+
+fall_score = 0.55 * P(fall) * geometry_gate
            + 0.18 * vertical_drop
            + 0.14 * body_angle
            + 0.08 * low_posture
            + 0.05 * track_stability
 ```
+
+`fall_geometry` 取 32 帧窗口内姿态摔倒提示的最大值。模型给出高 `P(fall)` 但没有下落、横卧或低姿态证据时，模型项会被软衰减。同一 track/重叠区域刚确认 Fight 后，10 秒内的弱几何 Fall 还会被视为同一冲突事件；强几何摔倒可以覆盖该抑制。
 
 ```mermaid
 stateDiagram-v2
@@ -191,6 +195,8 @@ python -m edge_app.run \
 | `events.fight.confirm_threshold`             | 0.52  | Fight 确认分数阈值     |
 | `events.fight.confirm_clip_count`            | 3     | Fight 连续确认窗口数    |
 | `events.fight.single_person_model_threshold` | 0.85  | 遮挡合并框回退门槛        |
+| `events.fall.model_geometry_gate_threshold`  | 0.15  | Fall 模型项满权重几何门槛  |
+| `events.cross_event_suppression_sec`         | 10    | Fight 对弱 Fall 的抑制时间 |
 | `events.evidence_pre_sec/post_sec`           | 5 / 5 | 告警前后证据时长         |
 
 阈值调整前先查看诊断文件，不要仅根据单个视频直接降低确认阈值。

@@ -68,6 +68,7 @@ class EventCandidate:
     track_ids: List[int]
     bbox_xyxy: BBox
     timestamp: float
+    features: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass

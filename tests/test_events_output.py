@@ -57,3 +57,56 @@ def test_event_writer_outputs_json_snapshot_and_video(tmp_path):
     payload = json.loads((tmp_path / "events.jsonl").read_text(encoding="utf-8").strip())
     assert payload["event_type"] == "fight"
     assert payload["state"] == "CONFIRMED"
+
+
+def test_recent_fight_suppresses_weak_fall_for_same_track():
+    cfg = EventsConfig(
+        cross_event_suppression_sec=10.0,
+        fall_geometry_override_threshold=0.35,
+        fight=BehaviorEventConfig(
+            suspect_threshold=0.5,
+            confirm_threshold=0.5,
+            confirm_clip_count=2,
+        ),
+        fall=BehaviorEventConfig(
+            suspect_threshold=0.5,
+            confirm_threshold=0.5,
+            confirm_duration_sec=0.5,
+        ),
+    )
+    sm = EventStateMachine(cfg, "test")
+    sm.update([EventCandidate("fight", 0.9, [10], (0, 0, 100, 100), 0.0)])
+    fight = sm.update([EventCandidate("fight", 0.9, [10], (0, 0, 100, 100), 0.2)])
+    assert [record.event_type for record in fight] == ["fight"]
+
+    weak_fall = EventCandidate(
+        "fall", 0.9, [10], (0, 0, 100, 100), 1.0, {"fall_geometry": 0.10}
+    )
+    assert sm.update([weak_fall]) == []
+    assert sm.snapshot()["fall"] == "NORMAL"
+    assert sm.suppression_snapshot()[0]["reason"] == "recent_fight_same_incident"
+
+
+def test_strong_fall_geometry_can_override_recent_fight():
+    cfg = EventsConfig(
+        cross_event_suppression_sec=10.0,
+        fall_geometry_override_threshold=0.35,
+        fight=BehaviorEventConfig(
+            suspect_threshold=0.5,
+            confirm_threshold=0.5,
+            confirm_clip_count=2,
+        ),
+        fall=BehaviorEventConfig(
+            suspect_threshold=0.5,
+            confirm_threshold=0.5,
+            confirm_duration_sec=0.5,
+        ),
+    )
+    sm = EventStateMachine(cfg, "test")
+    sm.update([EventCandidate("fight", 0.9, [10], (0, 0, 100, 100), 0.0)])
+    sm.update([EventCandidate("fight", 0.9, [10], (0, 0, 100, 100), 0.2)])
+    strong = {"fall_geometry": 0.60}
+    sm.update([EventCandidate("fall", 0.9, [10], (0, 0, 100, 100), 1.0, strong)])
+    records = sm.update([EventCandidate("fall", 0.9, [10], (0, 0, 100, 100), 1.6, strong)])
+
+    assert [record.event_type for record in records] == ["fall"]

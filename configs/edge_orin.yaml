@@ -48,11 +48,20 @@ events:
   snapshot_dir: snapshots
   video_dir: videos
   jsonl_name: events.jsonl
+  # Prefer an already confirmed fight over a weak-geometry fall from the same
+  # track/area. Strong fall motion can override this suppression.
+  cross_event_suppression_sec: 10.0
+  cross_event_iou_threshold: 0.30
+  fall_geometry_override_threshold: 0.35
   fall:
     suspect_threshold: 0.48
     confirm_threshold: 0.62
     confirm_duration_sec: 0.8
     candidate_gap_sec: 1.0
+    # A high P(fall) cannot independently confirm Fall. The strongest pose
+    # geometry observed over the 32-frame clip softly gates model confidence.
+    model_geometry_gate_threshold: 0.15
+    model_geometry_gate_floor: 0.25
     cooldown_sec: 8.0
     weights:
       model: 0.55

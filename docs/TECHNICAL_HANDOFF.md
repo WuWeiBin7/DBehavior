@@ -333,14 +333,16 @@ fight_score = 0.72 * P(fight)
 ### 9.2 Fall
 
 ```text
-fall_score = 0.55 * P(fall)
+geometry_gate = clip(max(0.25, fall_geometry / 0.15), 0, 1)
+
+fall_score = 0.55 * P(fall) * geometry_gate
            + 0.18 * vertical_drop
            + 0.14 * body_angle
            + 0.08 * low_posture
            + 0.05 * track_stability
 ```
 
-`vertical_drop` 使用近期 bbox 中心下移量；`body_angle` 使用肩与髋连线的水平程度；`low_posture` 使用 bbox 宽高比；所有特征裁剪到 `[0,1]`。
+`fall_geometry` 取当前姿态几何与 32 帧 Clip 内 `fall_hint` 最大值中的较大者。`vertical_drop` 使用近期 bbox 中心下移量；`body_angle` 使用肩与髋连线的水平程度；`low_posture` 使用 bbox 宽高比；所有特征裁剪到 `[0,1]`。该门控用于避免动作模型在打架合并框上输出高 `P(fall)` 时独立决定事件。
 
 这些规则对云台运动并不完全鲁棒。机器人快速俯仰时，画面整体运动会影响 drop 和 keypoint motion。后续应接入 IMU/云台姿态，或先做全局运动补偿。
 
@@ -376,7 +378,19 @@ confirm_threshold: 0.62
 confirm_duration_sec: 0.8
 candidate_gap_sec: 1.0
 cooldown_sec: 8.0
+model_geometry_gate_threshold: 0.15
+model_geometry_gate_floor: 0.25
 ```
+
+跨行为仲裁参数：
+
+```yaml
+cross_event_suppression_sec: 10.0
+cross_event_iou_threshold: 0.30
+fall_geometry_override_threshold: 0.35
+```
+
+同一 track 或重叠区域刚确认 Fight 后，达到 Fall 可疑阈值但几何证据低于 `0.35` 的 Fall 在 10 秒内被抑制。几何证据达到覆盖阈值时仍允许报告 Fall，以保留“打架后真实摔倒”的能力。
 
 Fight 的第一次候选进入 SUSPECT 并将 `clip_count=1`；后续候选达到 confirm threshold 且计数达到 3 时确认。Fall 使用 `candidate.timestamp - start_ts` 确认持续时长。
 
