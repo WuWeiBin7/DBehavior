@@ -1,0 +1,92 @@
+input:
+  rtsp_url: ""
+  width: 1280
+  height: 720
+  target_fps: 15
+  reconnect_sec: 3.0
+  use_gstreamer: true
+
+models:
+  pose:
+    path: weights/yolo26s-pose.engine
+    format: ultralytics_pose
+    box_format: auto
+    input_size: [640, 640]
+    conf_threshold: 0.30
+    iou_threshold: 0.45
+    max_detections: 50
+  action:
+    path: weights/video_swin_tiny.engine
+    input_size: [224, 224]
+    # behavior3cls training order: normal=0, fight=1, fall=2.
+    # The source is normalized to 15 FPS, so 32x1 covers about the same
+    # two-second temporal window as training's 32x2 sampling at 30 FPS.
+    clip_length: 32
+    sample_stride: 1
+    infer_interval_frames: 4
+    labels: [normal, fight, fall]
+
+tracking:
+  track_high_thresh: 0.40
+  track_low_thresh: 0.10
+  match_thresh: 0.75
+  max_age: 30
+  min_hits: 2
+
+candidates:
+  fall_min_hint: 0.20
+  fall_min_history: 4
+  fall_roi_scale: 1.45
+  fight_min_hint: 0.10
+  fight_min_proximity: 0.10
+  fight_roi_scale: 1.45
+
+events:
+  evidence_pre_sec: 5.0
+  evidence_post_sec: 5.0
+  output_dir: outputs/edge_events
+  snapshot_dir: snapshots
+  video_dir: videos
+  jsonl_name: events.jsonl
+  fall:
+    suspect_threshold: 0.48
+    confirm_threshold: 0.62
+    confirm_duration_sec: 0.8
+    candidate_gap_sec: 1.0
+    cooldown_sec: 8.0
+    weights:
+      model: 0.55
+      vertical_drop: 0.18
+      body_angle: 0.14
+      low_posture: 0.08
+      track_stability: 0.05
+  fight:
+    suspect_threshold: 0.38
+    confirm_threshold: 0.52
+    confirm_clip_count: 3
+    candidate_gap_sec: 1.0
+    # When heavy occlusion merges two fighters into one pose box, reuse the
+    # person clip only if Video Swin is highly confident; state confirmation
+    # still requires three consecutive action windows.
+    single_person_fallback: true
+    single_person_model_threshold: 0.85
+    cooldown_sec: 10.0
+    weights:
+      model: 0.72
+      proximity: 0.10
+      limb_motion: 0.08
+      overlap: 0.05
+      continuous: 0.05
+
+runtime:
+  device: cuda
+  fp16: true
+  dry_run_mode: none
+  save_vis: false
+  vis_path: outputs/edge_events/vis.mp4
+  max_frames: 0
+  allow_action_fallback: false
+  diagnostics_enabled: true
+  diagnostics_path: outputs/edge_events/diagnostics.json
+  scores_jsonl_path: outputs/edge_events/action_scores.jsonl
+  log_interval_frames: 30

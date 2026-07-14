@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+outputs/
+dataset/
+weights/*.onnx
+weights/*.engine
+weights/*.pt
+weights/*.pth
+weights/*.data
+weights/*.onnx.data
+
+*.mp4.tmp
